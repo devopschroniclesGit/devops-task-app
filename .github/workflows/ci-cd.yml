@@ -36,6 +36,7 @@ jobs:
             docker stop task-app || true
             docker rm task-app || true
 
+
             docker run -d \
               -p 80:5000 \
               --name task-app \
