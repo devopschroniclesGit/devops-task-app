@@ -24,7 +24,6 @@ jobs:
       - name: Push Docker Image
         run: docker push ${{ secrets.DOCKER_USERNAME }}/task-app:latest
 
-
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v1.0.0
         with:
@@ -45,5 +44,4 @@ jobs:
               -e DB_USER=devuser \
               -e DB_PASSWORD=devpass \
               -e DB_NAME=taskdb \
-              ${{ secrets.DOCKER_USERNAME }}/task-app:latest
-
+            devopschroniclesdocker/task-app:latest
