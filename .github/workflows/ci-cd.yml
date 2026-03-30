@@ -23,7 +23,30 @@ jobs:
 
       - name: Push Docker Image
         run: docker push ${{ secrets.DOCKER_USERNAME }}/task-app:latest
+      - name: Debug secret presence
+        run: |
+        if [ -z "${{ secrets.EC2_HOST }}" ]; then
+          echo "EC2_HOST missing"
+          exit 1
+        else
+          echo "EC2_HOST secret is present"
+        fi
 
+        if [ -z "${{ secrets.DOCKER_USERNAME }}" ]; then
+          echo "DOCKER_USERNAME missing"
+          exit 1
+        else
+          echo "DOCKER_USERNAME secret is present"
+        fi
+
+      - name: Test DNS resolution from runner
+        run: |
+          echo "Testing host resolution..."
+          nslookup ${{ secrets.EC2_HOST }} || ping -c 2 ${{ secrets.EC2_HOST }}
+
+      - name: Echo docker image name
+        run: |
+          echo "docker.io/${{ secrets.DOCKER_USERNAME }}/task-app:latest"
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v1.0.0
         with:
@@ -31,6 +54,11 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
+            echo "Connected to EC2 successfully"
+            hostname
+            whoami
+            docker --version
+
             docker pull docker.io/devopschroniclesdocker/task-app:latest
 
             docker stop task-app || true
