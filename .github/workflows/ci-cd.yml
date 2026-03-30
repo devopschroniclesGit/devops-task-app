@@ -44,4 +44,4 @@ jobs:
               -e DB_USER=devuser \
               -e DB_PASSWORD=devpass \
               -e DB_NAME=taskdb \
-            devopschroniclesdocker/task-app:latest
+              devopschroniclesdocker/task-app:latest
