@@ -45,3 +45,4 @@ jobs:
               -e DB_PASSWORD=devpass \
               -e DB_NAME=taskdb \
               ${{ secrets.DOCKER_USERNAME }}/task-app:latest
+
