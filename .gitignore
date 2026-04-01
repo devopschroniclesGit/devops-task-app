@@ -1,3 +1,7 @@
 .terraform/
 *.tfstate
 *.tfstate.backup
+*.log
+.env
+terraform.tfstate
+*.tfvars
