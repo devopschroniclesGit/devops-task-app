@@ -1,4 +1,4 @@
-name: CI/CD Pipeline
+name: Task API | Build, Push and Deploy
 
 on:
   push:
@@ -7,67 +7,64 @@ on:
     paths-ignore:
       - 'chapters/**'
       - '**/*.md'
+  workflow_dispatch:
 
 jobs:
-  build-and-deploy:
+  deploy-application:
     runs-on: ubuntu-latest
 
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
+    env:
+      IMAGE_NAME: docker.io/${{ secrets.DOCKER_USERNAME }}/task-app:latest
 
-      - name: Login to Docker Hub
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Authenticate with Docker Hub
         run: |
           docker logout || true
-          echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+          echo "${{ secrets.DOCKER_PASSWORD }}" | \
+          docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
 
-      - name: Build Docker Image
-        run: docker build -t ${{ secrets.DOCKER_USERNAME }}/task-app:latest ./app
+      - name: Build Docker image
+        run: docker build -t $IMAGE_NAME ./app
 
-      - name: Push Docker Image
-        run: docker push ${{ secrets.DOCKER_USERNAME }}/task-app:latest
-      - name: Debug secret presence
+      - name: Push Docker image
+        run: docker push $IMAGE_NAME
+
+      - name: Validate deployment secrets
         run: |
-         if [ -z "${{ secrets.EC2_HOST }}" ]; then
-           echo "EC2_HOST missing"
-           exit 1
-          else
-            echo "EC2_HOST secret is present"
-          fi
+          [ -z "${{ secrets.EC2_HOST }}" ] && echo "EC2_HOST missing" && exit 1
+          [ -z "${{ secrets.EC2_USER }}" ] && echo "EC2_USER missing" && exit 1
+          [ -z "${{ secrets.EC2_SSH_KEY }}" ] && echo "EC2_SSH_KEY missing" && exit 1
+          echo "All deployment secrets validated"
 
-          if [ -z "${{ secrets.DOCKER_USERNAME }}" ]; then
-            echo "DOCKER_USERNAME missing"
-            exit 1
-          else
-            echo "DOCKER_USERNAME secret is present"
-          fi
-
-      - name: Test DNS resolution from runner
+      - name: Test EC2 connectivity
         run: |
-          echo "Testing host resolution..."
-          nslookup ${{ secrets.EC2_HOST }} || ping -c 2 ${{ secrets.EC2_HOST }}
+          echo "Checking host..."
+          ping -c 2 ${{ secrets.EC2_HOST }}
 
-      - name: Echo docker image name
-        run: |
-          echo "docker.io/${{ secrets.DOCKER_USERNAME }}/task-app:latest"
       - name: Deploy to EC2
-        uses: appleboy/ssh-action@v1.0.0
+        uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            echo "Connected to EC2 successfully"
+            IMAGE_NAME="docker.io/${{ secrets.DOCKER_USERNAME }}/task-app:latest"
+
+            echo "Connected successfully"
             hostname
             whoami
             docker --version
 
-            docker pull docker.io/devopschroniclesdocker/task-app:latest
+            docker pull $IMAGE_NAME
 
             docker stop task-app || true
             docker rm task-app || true
 
             docker run -d \
+              --restart unless-stopped \
               -p 80:5000 \
               --name task-app \
               --network app-network \
@@ -75,4 +72,4 @@ jobs:
               -e DB_USER=devuser \
               -e DB_PASSWORD=devpass \
               -e DB_NAME=taskdb \
-              docker.io/devopschroniclesdocker/task-app:latest
+              $IMAGE_NAME

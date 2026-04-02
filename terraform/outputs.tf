@@ -1,3 +1,4 @@
 output "elastic_ip" {
-  value = aws_eip.app_eip.public_ip
+  description = "Elastic IP used by GitHub Actions deployment"
+  value       = aws_eip.app_eip.public_ip
 }
