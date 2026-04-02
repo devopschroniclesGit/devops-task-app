@@ -48,6 +48,8 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
+            docker network create app-network || true
+
             IMAGE_NAME="docker.io/${{ secrets.DOCKER_USERNAME }}/task-app:latest"
 
             echo "Connected successfully"
@@ -70,3 +72,4 @@ jobs:
               -e DB_PASSWORD=devpass \
               -e DB_NAME=taskdb \
               $IMAGE_NAME
+
