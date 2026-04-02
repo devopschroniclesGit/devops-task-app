@@ -56,7 +56,16 @@ jobs:
             hostname
             whoami
             docker --version
-
+            
+            docker rm -f postgres-db || true
+            docker run -d \
+              --name postgres-db \
+              --network app-network \
+              -e POSTGRES_USER=devuser \
+              -e POSTGRES_PASSWORD=devpass \
+              -e POSTGRES_DB=taskdb \
+              postgres:15
+            
             docker pull $IMAGE_NAME
 
             docker stop task-app || true
