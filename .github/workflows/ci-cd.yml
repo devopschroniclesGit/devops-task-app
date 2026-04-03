@@ -84,4 +84,4 @@ jobs:
       - name: Health check application
         run: |
           sleep 10
-        curl -f http://api.devopschronicles.com:5000/health
+          curl -f http://api.devopschronicles.com:5000/health
