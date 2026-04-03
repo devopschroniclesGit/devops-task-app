@@ -32,15 +32,6 @@ jobs:
       - name: Push Docker image
         run: docker push $IMAGE_NAME
 
-      - name: Validate deployment secrets
-        run: |
-          [ -z "${{ secrets.EC2_HOST }}" ] && echo "EC2_HOST missing" && exit 1
-          echo "All deployment secrets validated"
-
-      - name: Test EC2 connectivity
-        run: |
-          nc -zv ${{ secrets.EC2_HOST }} 22
-
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -52,11 +43,6 @@ jobs:
 
             IMAGE_NAME="docker.io/${{ secrets.DOCKER_USERNAME }}/task-app:latest"
 
-            echo "Connected successfully"
-            hostname
-            whoami
-            docker --version
-            
             docker rm -f postgres-db || true
             docker run -d \
               --name postgres-db \
