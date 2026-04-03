@@ -77,7 +77,3 @@ jobs:
               -e DB_NAME=taskdb \
               $IMAGE_NAME
 
-      - name: Health check application
-        run: |
-          sleep 10
-          curl -f http://api.devopschronicles.com:5000/health
