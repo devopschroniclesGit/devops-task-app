@@ -77,3 +77,5 @@ jobs:
               -e DB_NAME=taskdb \
               $IMAGE_NAME
 
+            sleep 10
+            curl -f http://localhost/health
