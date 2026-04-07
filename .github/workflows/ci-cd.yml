@@ -10,7 +10,36 @@ on:
   workflow_dispatch:
 
 jobs:
+  terraform:
+    runs-on: ubuntu-latest
+
+    outputs:
+      ec2_ip: ${{ steps.tf_output.outputs.ec2_ip }}
+
+    defaults:
+      run:
+        working-directory: ./terraform
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve
+
+      - name: Capture Elastic IP
+        id: tf_output
+        run: |
+          echo "ec2_ip=$(terraform output -raw elastic_ip)" >> $GITHUB_OUTPUT
+
   deploy-application:
+    needs: terraform
     runs-on: ubuntu-latest
 
     env:
@@ -32,21 +61,14 @@ jobs:
       - name: Push Docker image
         run: docker push $IMAGE_NAME
 
-      - name: Validate deployment secrets
-        run: |
-          [ -z "${{ secrets.EC2_USER }}" ] && echo "EC2_USER missing" && exit 1
-          [ -z "${{ secrets.EC2_SSH_KEY }}" ] && echo "EC2_SSH_KEY missing" && exit 1
-          echo "Deployment validated"
-
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.EC2_HOST }}
+          host: ${{ needs.terraform.outputs.ec2_ip }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           timeout: 60s
           command_timeout: 10m
-
           script: |
             docker network create app-network || true
 
@@ -60,7 +82,7 @@ jobs:
               -e POSTGRES_PASSWORD=devpass \
               -e POSTGRES_DB=taskdb \
               postgres:15
-            
+
             docker pull $IMAGE_NAME
 
             docker stop task-app || true
