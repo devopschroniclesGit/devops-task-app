@@ -1,4 +1,4 @@
-name: Task API | Build, Push and Deploy
+name: CI/CD Pipeline
 
 on:
   push:
@@ -7,96 +7,69 @@ on:
     paths-ignore:
       - 'chapters/**'
       - '**/*.md'
-  workflow_dispatch:
+
 
 jobs:
-  terraform:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
-    outputs:
-      ec2_ip: ${{ steps.tf_output.outputs.ec2_ip }}
-
-    defaults:
-      run:
-        working-directory: ./terraform
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v3
 
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-
-      - name: Terraform Init
-        run: terraform init
-
-      - name: Terraform Apply
-        run: terraform apply -auto-approve
-
-      - name: Capture Elastic IP
-        id: tf_output
-        run: |
-          echo "ec2_ip=$(terraform output -raw elastic_ip)" >> $GITHUB_OUTPUT
-
-  deploy-application:
-    needs: terraform
-    runs-on: ubuntu-latest
-
-    env:
-      IMAGE_NAME: docker.io/${{ secrets.DOCKER_USERNAME }}/task-app:latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Authenticate with Docker Hub
+      - name: Login to Docker Hub
         run: |
           docker logout || true
-          echo "${{ secrets.DOCKER_PASSWORD }}" | \
-          docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+          echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
 
-      - name: Build Docker image
-        run: docker build -t $IMAGE_NAME ./app
+      - name: Build Docker Image
+        run: docker build -t ${{ secrets.DOCKER_USERNAME }}/task-app:latest ./app
 
-      - name: Push Docker image
-        run: docker push $IMAGE_NAME
+      - name: Push Docker Image
+        run: docker push ${{ secrets.DOCKER_USERNAME }}/task-app:latest
+      - name: Debug secret presence
+        run: |
+         if [ -z "${{ secrets.EC2_HOST }}" ]; then
+           echo "EC2_HOST missing"
+           exit 1
+          else
+            echo "EC2_HOST secret is present"
+          fi
 
+          if [ -z "${{ secrets.DOCKER_USERNAME }}" ]; then
+            echo "DOCKER_USERNAME missing"
+            exit 1
+          else
+            echo "DOCKER_USERNAME secret is present"
+          fi
+
+      - name: Test DNS resolution from runner
+        run: |
+          echo "Testing host resolution..."
+          nslookup ${{ secrets.EC2_HOST }} || ping -c 2 ${{ secrets.EC2_HOST }}
+
+      - name: Echo docker image name
+        run: |
+          echo "docker.io/${{ secrets.DOCKER_USERNAME }}/task-app:latest"
       - name: Deploy to EC2
-        uses: appleboy/ssh-action@v1.0.3
+        uses: appleboy/ssh-action@v1.0.0
         with:
-          host: ${{ needs.terraform.outputs.ec2_ip }}
+          host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          timeout: 60s
-          command_timeout: 10m
           script: |
-            docker network create app-network || true
+            echo "Connected to EC2 successfully"
+            hostname
+            whoami
+            docker --version
 
-            IMAGE_NAME="docker.io/${{ secrets.DOCKER_USERNAME }}/task-app:latest"
-
-            docker rm -f postgres-db || true
-            docker run -d \
-              --name postgres-db \
-              --network app-network \
-              -e POSTGRES_USER=devuser \
-              -e POSTGRES_PASSWORD=devpass \
-              -e POSTGRES_DB=taskdb \
-              postgres:15
-
-            docker pull $IMAGE_NAME
+            docker pull docker.io/devopschroniclesdocker/task-app:latest
 
             docker stop task-app || true
             docker rm task-app || true
 
+
             docker run -d \
-              --restart unless-stopped \
               -p 80:5000 \
               --name task-app \
               --network app-network \
@@ -104,4 +77,4 @@ jobs:
               -e DB_USER=devuser \
               -e DB_PASSWORD=devpass \
               -e DB_NAME=taskdb \
-              $IMAGE_NAME
+              docker.io/devopschroniclesdocker/task-app:latest
