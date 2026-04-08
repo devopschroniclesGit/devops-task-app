@@ -59,17 +59,26 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             echo "Connected to EC2 successfully"
-            hostname
-            whoami
-            docker --version
 
-            docker pull docker.io/devopschroniclesdocker/task-app:latest
+            docker network create app-network || true
+            
+            docker rm -f postgres-db || true 
+            docker run -d \ 
+            --name postgres-db \ 
+            --network app-network \ 
+            -e POSTGRES_USER=devuser \ 
+            -e POSTGRES_PASSWORD=devpass \ 
+            -e POSTGRES_DB=taskdb \ 
+            postgres:15
+
+            docker pull $IMAGE_NAME
 
             docker stop task-app || true
             docker rm task-app || true
 
 
             docker run -d \
+              --restart unless-stopped \
               -p 80:5000 \
               --name task-app \
               --network app-network \
@@ -77,4 +86,4 @@ jobs:
               -e DB_USER=devuser \
               -e DB_PASSWORD=devpass \
               -e DB_NAME=taskdb \
-              docker.io/devopschroniclesdocker/task-app:latest
+              $IMAGE_NAME
