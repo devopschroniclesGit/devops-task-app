@@ -36,7 +36,7 @@ def home():
         db.close()
 
 
-@app.route("/health")
+@app.route("/health"), methods=['GET'])
 def health():
     db = SessionLocal()
 
@@ -45,6 +45,7 @@ def health():
 
         return {
             "status": "healthy",
+            "service:" "task-app",
             "database": "connected",
             "hostname": socket.gethostname(),
             "total_tasks": task_count
