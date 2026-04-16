@@ -1,0 +1,11 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'task-app'
+    static_configs:
+      - targets: ['host.docker.internal:5000']
+
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['prometheus:9090']
